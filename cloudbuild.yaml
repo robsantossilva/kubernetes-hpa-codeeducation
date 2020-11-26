@@ -1,0 +1,49 @@
+steps:
+
+  # Configurar uma secret contendo a senha do docker hub com o nome (docker-hub-password)
+- id: "Secret Manager"
+  name: gcr.io/cloud-builders/gcloud
+  entrypoint: 'bash'
+  args: [ '-c', "gcloud secrets versions access latest --secret=docker-hub-password --format='get(payload.data)' | tr '_-' '/+' | base64 -d > decrypted-data.txt" ]
+
+- id: "docker login"
+  name: gcr.io/cloud-builders/docker
+  entrypoint: 'bash'
+  args: [ '-c', 'docker login --username=robsantossilva --password-stdin < decrypted-data.txt']
+
+- id: "Rodando install"
+  name: "gcr.io/cloud-builders/go"
+  args: ["install", "go-hpa"]
+  env: ["GOPATH=."]
+
+- id: "Rodando Test"
+  name: "gcr.io/cloud-builders/go"
+  args: ["test", "go-hpa"]
+  env: ["GOPATH=."]
+
+- id: "Rodando Build"
+  name: "gcr.io/cloud-builders/docker"
+  args:
+  - 'build'
+  - '-t'
+  - 'robsantossilva/go-hpa:latest'
+  - '-t'
+  - 'robsantossilva/go-hpa:$SHORT_SHA'
+  - '.'
+
+- id: "Rodando Push Latest"
+  name: "gcr.io/cloud-builders/docker"
+  args: ["push", "robsantossilva/go-hpa:latest"]
+
+- id: "Rodando Push"
+  name: "gcr.io/cloud-builders/docker"
+  args: ["push", "robsantossilva/go-hpa:$SHORT_SHA"]
+
+- id: "Deploy Kubernetes"
+  name: "gcr.io/cloud-builders/gke-deploy"
+  args:
+  - run
+  - --filename=./k8s
+  - --image=robsantossilva/go-hpa:latest
+  - --location=us-central1-c
+  - --cluster=my-first-cluster-1
