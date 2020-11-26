@@ -1,6 +1,6 @@
 FROM golang:1.14.9-alpine as builder
 WORKDIR /go/src/
-COPY /src/desafio-go .
+COPY /src/go-hpa .
 RUN GOOS=linux go build main.go
 
 FROM scratch
